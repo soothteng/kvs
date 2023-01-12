@@ -1,6 +1,6 @@
 use kvs::{KvStore, Result};
-use std::path::Path;
-use std::process;
+use log::{error, info, LevelFilter};
+use std::env;
 use structopt::clap::{App, AppSettings, Arg};
 
 fn main() -> Result<()> {
@@ -27,5 +27,11 @@ fn main() -> Result<()> {
         )
         .get_matches();
 
-    unimplemented!();
+    let addr = matches.value_of("addr").expect("wtf");
+    let engine = matches.value_of("engine").expect("wtf");
+
+    info!("kvs-server {}", env!("CARGO_PKG_VERSION"));
+    info!("Storage engine: {}", engine);
+    info!("Listening on {}", addr);
+    Ok(())
 }
