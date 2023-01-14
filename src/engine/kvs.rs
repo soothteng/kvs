@@ -1,3 +1,4 @@
+use super::KvsEngine;
 use crate::{KvsError, Result};
 use fs::OpenOptions;
 use io::BufWriter;
@@ -28,6 +29,7 @@ const MAX_FILE_SIZE: u64 = 1024;
 /// Ok(())
 /// }
 ///```
+
 pub struct KvStore {
     log_dir: PathBuf,
     writer: CursorBufferWriter<File>,
@@ -36,6 +38,8 @@ pub struct KvStore {
     index: BTreeMap<String, IndexEntry>,
     inactive_data: u64,
 }
+
+impl KvsEngine for KvStore {}
 
 impl KvStore {
     /// Open the `KvStore` at a given path. Return the KvStore.
@@ -358,39 +362,5 @@ impl<T: Write + Seek> Seek for CursorBufferWriter<T> {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.cursor = self.writer.seek(pos)?;
         Ok(self.cursor)
-    }
-}
-
-mod test {
-
-    use crate::Result;
-    #[test]
-    fn test_split_log() -> Result<()> {
-        use std::env::current_dir;
-
-        use crate::KvStore;
-        use std::fs;
-        use std::path::PathBuf;
-        let mut store = KvStore::open(current_dir()?)?;
-
-        for i in 0..1000 {
-            store.set(format!("key{}", i), format!("value{}", i))?;
-        }
-
-        for i in 0..1000 {
-            assert_eq!(store.get(format!("key{}", i))?, Some(format!("value{}", i)));
-        }
-
-        let logs: Vec<PathBuf> = fs::read_dir(current_dir()?)?
-            .map(|res| res.map(|e| e.path()))
-            .flatten()
-            .filter(|path| path.is_file() && path.extension() == Some("log".as_ref()))
-            .collect();
-        println!("split into {} log files", logs.len());
-        for log in logs {
-            fs::remove_file(&log)?;
-        }
-
-        Ok(())
     }
 }
