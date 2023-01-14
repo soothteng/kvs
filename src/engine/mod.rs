@@ -2,7 +2,6 @@ use crate::Result;
 
 /// trait for a key/value store engine
 pub trait KvsEngine {
-    /*
     /// Set the value of a string key to a string
     ///
     /// If the key already exists, the previous value will be overwritten.
@@ -17,7 +16,6 @@ pub trait KvsEngine {
     ///
     /// If the key does not exist, do nothing.
     fn remove(&mut self, key: String) -> Result<()>;
-    */
 }
 
 pub use self::sled::SledKvsEngine;

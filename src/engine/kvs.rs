@@ -39,7 +39,91 @@ pub struct KvStore {
     inactive_data: u64,
 }
 
-impl KvsEngine for KvStore {}
+impl KvsEngine for KvStore {
+    /// Set the string value of a given string key.
+    ///
+    /// If the given key already exists, the previous value will be overwitten.
+    ///
+    /// # Errors
+    ///
+    /// Errors may be thrown when I/O and serializing
+    fn set(&mut self, key: String, value: String) -> Result<()> {
+        let command = Command::set(key, value);
+        let offset = self.writer.cursor;
+        serde_json::to_writer(&mut self.writer, &command)?;
+        self.writer.flush()?;
+        if let Some(index) = self.index.insert(
+            command.key(),
+            IndexEntry::new(self.file_id, offset, self.writer.cursor),
+        ) {
+            self.inactive_data += index.len;
+        }
+        if self.writer.cursor > MAX_FILE_SIZE {
+            self.file_id += 1;
+            self.writer = self.new_log_file(self.file_id)?;
+        }
+        if self.inactive_data >= MAX_INACTIVE_DATA_SIZE {
+            self.compact()?;
+        }
+
+        Ok(())
+    }
+
+    /// Get the string value of a given string key.
+    ///
+    /// Returns `None` if the given key does not exist.
+    ///
+    /// # Errors
+    ///
+    /// Errors may be thrown when I/O and serializing
+    fn get(&mut self, key: String) -> Result<Option<String>> {
+        if let Some(index) = self.index.get(&key) {
+            let reader = self
+                .readers
+                .get_mut(&index.file_id)
+                .expect("Internal error");
+            reader.seek(SeekFrom::Start(index.offset))?;
+            let cmd_reader = reader.take(index.len);
+            if let Command::Set { value, .. } = serde_json::from_reader(cmd_reader)? {
+                Ok(Some(value))
+            } else {
+                Err(KvsError::BrokenCommand)
+            }
+        } else {
+            // not an error, beaause we need to exit normally with code 0
+            Ok(None)
+        }
+    }
+
+    /// Remove a given string key.
+    ///
+    /// # Errors
+    ///
+    /// Returns `KvsError::KeyNotFound` if the given ket does not exixt.
+    /// Errors may be thrown when I/O and serializing
+    fn remove(&mut self, key: String) -> Result<()> {
+        if self.index.contains_key(&key) {
+            let command = Command::rm(key);
+            serde_json::to_writer(&mut self.writer, &command)?;
+            self.writer.flush()?;
+            if self.writer.cursor > MAX_FILE_SIZE {
+                self.file_id += 1;
+                self.writer = self.new_log_file(self.file_id)?;
+            }
+            if let Some(index) = self.index.remove(&command.key()) {
+                self.inactive_data += index.len;
+                if self.inactive_data >= MAX_INACTIVE_DATA_SIZE {
+                    self.compact()?;
+                }
+                Ok(())
+            } else {
+                Err(KvsError::BrokenIndex)
+            }
+        } else {
+            Err(KvsError::KeyNotFound)
+        }
+    }
+}
 
 impl KvStore {
     /// Open the `KvStore` at a given path. Return the KvStore.
@@ -81,7 +165,7 @@ impl KvStore {
                 Err(KvsError::BrokenCommand)
             }
         } else {
-            // not an error, beaause we need to exit normally with code 0
+            // not an error, because we need to exit normally with code 0
             Ok(None)
         }
     }
@@ -241,7 +325,7 @@ fn load_logs(
 }
 
 fn get_file_ids(path: &Path) -> Result<Vec<u64>> {
-    // use flatten to unwarap Option or result
+    // use flatten to unwrap Option or result
     let mut ids: Vec<u64> = fs::read_dir(path)?
         .map(|res| res.map(|e| e.path()))
         .flatten()
@@ -298,7 +382,7 @@ impl IndexEntry {
     }
 }
 
-// serde_json recommand us to use buffer
+// serde_json recommend us to use buffer
 struct CursorBufferReader<T: Read + Seek> {
     reader: BufReader<T>,
     cursor: u64,

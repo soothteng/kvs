@@ -1,85 +1,89 @@
-use kvs::{KvStore, Result};
-use std::path::Path;
-use std::process;
-use structopt::clap::{App, AppSettings, Arg, SubCommand};
+use kvs::{KvsClient, Result};
+use std::net::SocketAddr;
+use std::process::exit;
+use structopt::StructOpt;
+const DEFAULT_ADDRESS: &str = "127.0.0.1:4000";
 
-fn main() -> Result<()> {
-    let mut kv = KvStore::open(Path::new("."))?;
+#[derive(Debug, StructOpt)]
+#[structopt(name = "kvs-client")]
+pub struct ClientArgs {
+    #[structopt(subcommand)]
+    pub command: Command,
+}
+#[derive(Debug, StructOpt)]
+pub enum Command {
+    #[structopt(name = "set", about = "Set the value of a string key to a string")]
+    Set {
+        #[structopt(name = "KEY", help = "A string key")]
+        key: String,
 
-    let matches = App::new(env!("CARGO_PKG_NAME"))
-        .version(env!("CARGO_PKG_VERSION"))
-        .author(env!("CARGO_PKG_AUTHORS"))
-        .about("A key-value store client")
-        .setting(AppSettings::DisableHelpSubcommand)
-        .subcommands(vec![
-            SubCommand::with_name("set")
-                .about("Set the value of a string key to a string")
-                .args_from_usage(
-                    "<KEY> 'the key you want to set'
-                    <VALUE> 'the value you want to set to the key'",
-                )
-                .arg(
-                    Arg::with_name("addr")
-                        .long("addr")
-                        .takes_value(true)
-                        .value_name("IP-PORT")
-                        .default_value("127.0.0.1:4000")
-                        .help("the server address"),
-                ),
-            SubCommand::with_name("get")
-                .about("Get the string value of a given string key")
-                .arg_from_usage("<KEY> 'the key you want to look up'")
-                .arg(
-                    Arg::with_name("addr")
-                        .long("addr")
-                        .takes_value(true)
-                        .value_name("IP-PORT")
-                        .default_value("127.0.0.1:4000")
-                        .help("the server address"),
-                ),
-            SubCommand::with_name("rm")
-                .about("Remove a given key")
-                .arg_from_usage("<KEY> 'the key you want to remove'")
-                .arg(
-                    Arg::with_name("addr")
-                        .long("addr")
-                        .takes_value(true)
-                        .value_name("IP-PORT")
-                        .default_value("127.0.0.1:4000")
-                        .help("the server address"),
-                ),
-        ])
-        .get_matches();
+        #[structopt(name = "VALUE", help = "The string value of the key")]
+        value: String,
 
-    match matches.subcommand() {
-        ("set", Some(matches)) => {
-            let addr = matches.value_of("addr").expect("wtf");
-            println!("{}", addr);
-            kv.set(
-                matches.value_of("KEY").unwrap().to_owned(),
-                matches.value_of("VALUE").unwrap().to_owned(),
-            )?
+        #[structopt(
+            long,
+            help = "The server address to be connected.",
+            default_value = DEFAULT_ADDRESS,
+            parse(try_from_str)
+        )]
+        addr: SocketAddr,
+    },
+
+    #[structopt(name = "get", about = "Get the string value of a given string key")]
+    Get {
+        #[structopt(name = "KEY", help = "A string key")]
+        key: String,
+
+        #[structopt(
+            long,
+            help = "The server address to be connected.",
+            default_value = DEFAULT_ADDRESS,
+            parse(try_from_str)
+        )]
+        addr: SocketAddr,
+    },
+
+    #[structopt(name = "rm", about = "Remove a given key")]
+    Remove {
+        #[structopt(name = "KEY", help = "A string key")]
+        key: String,
+
+        #[structopt(
+                long,
+                help = "The server address to be connected.",
+                default_value = DEFAULT_ADDRESS,
+                parse(try_from_str)
+            )]
+        addr: SocketAddr,
+    },
+}
+fn main() {
+    let opt = ClientArgs::from_args();
+    if let Err(err) = run(opt) {
+        eprintln!("{}", err);
+        exit(1);
+    }
+}
+
+fn run(opt: ClientArgs) -> Result<()> {
+    match opt.command {
+        Command::Set { key, value, addr } => {
+            // println!("set {} {} {}", key, value, addr);
+            let mut client = KvsClient::connect(addr)?;
+            client.set(key, value)?;
         }
-        ("get", Some(matches)) => {
-            let value = kv.get(matches.value_of("KEY").unwrap().to_owned())?;
-            match value {
-                Some(value) => {
-                    println!("{}", value);
-                }
-                None => {
-                    println!("Key not found");
-                }
-            }
-        }
-        ("rm", Some(matches)) => {
-            if let Err(_) = kv.remove(matches.value_of("KEY").unwrap().to_owned()) {
+        Command::Get { key, addr } => {
+            let mut client = KvsClient::connect(addr)?;
+            if let Some(value) = client.get(key)? {
+                println!("{}", value);
+            } else {
                 println!("Key not found");
-                process::exit(1)
             }
         }
-        _ => {
-            panic!("no args");
+        Command::Remove { key, addr } => {
+            let mut client = KvsClient::connect(addr)?;
+            client.remove(key)?;
         }
-    };
+    }
     Ok(())
 }
