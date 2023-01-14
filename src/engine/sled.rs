@@ -1,6 +1,5 @@
 use crate::Result;
 use crate::{KvsEngine, KvsError};
-use sled;
 use std::path::PathBuf;
 
 /// The `SledKvsEngine` is used to store Key/Value pairs based on `sled`.
@@ -52,7 +51,7 @@ impl KvsEngine for SledKvsEngine {
 
     fn remove(&mut self, key: String) -> Result<()> {
         let old_value = self.db.remove(key.as_str())?;
-        if let Some(_) = old_value {
+        if old_value.is_some() {
             self.db.flush()?;
             Ok(())
         } else {

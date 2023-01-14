@@ -1,7 +1,6 @@
 use crate::protocol::{Request, Response};
 use crate::{KvsEngine, Result};
 use log::{debug, error};
-use serde_json;
 use std::io::{BufReader, BufWriter, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
 

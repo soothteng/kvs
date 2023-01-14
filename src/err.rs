@@ -1,5 +1,4 @@
 use failure::Fail;
-use sled;
 use std::io;
 use std::string::FromUtf8Error;
 

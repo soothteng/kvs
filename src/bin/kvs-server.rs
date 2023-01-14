@@ -74,11 +74,13 @@ fn determine_engine(opt: &ServerArgs) -> Result<Engine> {
         } else if opt.engine.is_some() && previous_engine.is_none() {
             opt.engine.unwrap()
         } else if opt.engine.is_none() && previous_engine.is_some() {
+            // disable clippy warn(clippy::unnecessary_unwrap) here
+            #[allow(clippy::unnecessary_unwrap)]
             previous_engine.unwrap()
         } else {
             if opt.engine != previous_engine {
                 error!(
-                    "Engine inconsistent, previous engine: {:?}, choosen engine: {:?}",
+                    "Engine inconsistent, previous engine: {:?}, chosen engine: {:?}",
                     previous_engine.unwrap(),
                     opt.engine.unwrap()
                 );

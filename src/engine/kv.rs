@@ -90,7 +90,7 @@ impl KvsEngine for KvStore {
                 Err(KvsError::BrokenCommand)
             }
         } else {
-            // not an error, beaause we need to exit normally with code 0
+            // not an error, because we need to exit normally with code 0
             Ok(None)
         }
     }
@@ -99,7 +99,7 @@ impl KvsEngine for KvStore {
     ///
     /// # Errors
     ///
-    /// Returns `KvsError::KeyNotFound` if the given ket does not exixt.
+    /// Returns `KvsError::KeyNotFound` if the given ket does not exit.
     /// Errors may be thrown when I/O and serializing
     fn remove(&mut self, key: String) -> Result<()> {
         if self.index.contains_key(&key) {
@@ -325,18 +325,15 @@ fn load_logs(
 }
 
 fn get_file_ids(path: &Path) -> Result<Vec<u64>> {
-    // use flatten to unwrap Option or result
     let mut ids: Vec<u64> = fs::read_dir(path)?
-        .map(|res| res.map(|e| e.path()))
-        .flatten()
+        .flat_map(|res| res.map(|e| e.path()))
         .filter(|path| path.is_file() && path.extension() == Some("log".as_ref()))
-        .map(|path| {
+        .filter_map(|path| {
             path.file_name()
                 .and_then(OsStr::to_str)
                 .map(|name| name.trim_end_matches(".log"))
                 .map(str::parse::<u64>)
         })
-        .flatten()
         .flatten()
         .collect();
 
@@ -375,8 +372,8 @@ struct IndexEntry {
 impl IndexEntry {
     fn new(file_id: u64, offset: u64, end: u64) -> IndexEntry {
         IndexEntry {
-            file_id: file_id,
-            offset: offset,
+            file_id,
+            offset,
             len: end - offset,
         }
     }
@@ -394,7 +391,7 @@ impl<T: Read + Seek> CursorBufferReader<T> {
         let cursor = inner.seek(SeekFrom::Current(0))?;
         Ok(CursorBufferReader {
             reader: BufReader::new(inner),
-            cursor: cursor,
+            cursor,
         })
     }
 }
@@ -425,7 +422,7 @@ impl<T: Write + Seek> CursorBufferWriter<T> {
         let cursor = inner.seek(SeekFrom::Current(0))?;
         Ok(CursorBufferWriter {
             writer: BufWriter::new(inner),
-            cursor: cursor,
+            cursor,
         })
     }
 }
