@@ -23,4 +23,9 @@ predicates = "2.1.1"
 tempfile = "3.3.0"
 walkdir = "2.3.2"
 criterion = { version = "0.4.0", features = ["html_reports"] }
-rand = "0.8.5"
+rand = { version = "0.8.5", features = ["small_rng"] }
+pprof = { version = "0.11", features = ["flamegraph"] }
+
+[[bench]]
+name = "bench"
+harness = false
